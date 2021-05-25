@@ -1,4 +1,4 @@
-![效果图](https://upload-images.jianshu.io/upload_images/2379178-6c837de3c9d36d72.gif?imageMogr2/auto-orient/strip)
+![效果图](https://github.com/DeadAndLife/IrregularGradient/blob/main/May-24-2021%2017-05-07.gif)
 
 <b>需求分析</b>
 
