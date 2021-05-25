@@ -11,8 +11,10 @@
 NS_ASSUME_NONNULL_BEGIN
 
 typedef enum : NSUInteger {
-    LayerTypeSecondOrder,
-    LayerTypeThirdOrder,
+    LayerTypeSecondOrder    =   0b0<<0,
+    LayerTypeThirdOrder     =   0b1<<0,
+    LayerTypeChangeLocation =   0b0<<1,
+    LayerTypeChangeColor    =   0b1<<1,
 } NonLinearGradientLayerType;
 
 @interface NonLinearGradientLayerConfig : NSObject

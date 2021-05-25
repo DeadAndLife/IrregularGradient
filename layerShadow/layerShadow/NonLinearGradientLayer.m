@@ -8,6 +8,9 @@
 #define SCREEN_W [UIScreen mainScreen].bounds.size.width
 #define SCREEN_H [UIScreen mainScreen].bounds.size.height
 
+#define SecondBezier(t, P0, P1, P2) pow((1-t), 2) * P0 + 2 * (1-t) * t * P1 + pow(t, 2) * P2
+#define ThirdBezier(t, P0, P1, P2, P3) pow((1-t), 3) * P0 + 3 * pow((1-t), 2) * t * P1 + 3 * (1-t) * pow(t, 2) * P2 + pow(t, 3) * P3
+
 #import "NonLinearGradientLayer.h"
 
 @interface NonLinearGradientLayerConfig()
@@ -16,7 +19,7 @@
 @property(nonatomic, nullable, readwrite) NSArray *colors;
 
 /// 根据startPoint和endPoint和计算得出
-@property(nullable, readwrite) NSArray<NSNumber *> *locations;
+@property(nonatomic, nullable, readwrite) NSArray<NSNumber *> *locations;
 
 @end
 
@@ -25,9 +28,10 @@
 /// 默认设置 LayerTypeSecondOrder pointNumber controlPoint[0.5,0.5]
 + (instancetype)defaultConfig {
     NonLinearGradientLayerConfig *config = [self new];
-    config.type = LayerTypeSecondOrder;
+    config.type = LayerTypeSecondOrder|LayerTypeChangeLocation;
     config.controlPoint = 0.5;
     config.pointNumber = SCREEN_W;
+    
     return config;
 }
 
@@ -41,7 +45,7 @@
 - (instancetype)initWithStartPoint:(CGPoint)startPoint endPoint:(CGPoint)endPoint startColor:(UIColor *)startColor endColor:(UIColor *)endColor controlPoint:(CGFloat)controlPoint pointNumber:(NSInteger)pointNumber {
     self = [super init];
     
-    self.type = LayerTypeSecondOrder;
+    self.type = LayerTypeSecondOrder|LayerTypeChangeLocation;
     self.startPoint = startPoint;
     self.endPoint = endPoint;
     self.startColor = startColor;
@@ -63,7 +67,7 @@
 - (instancetype)initWithStartPoint:(CGPoint)startPoint endPoint:(CGPoint)endPoint startColor:(UIColor *)startColor endColor:(UIColor *)endColor control1Point:(CGFloat)control1Point control2Point:(CGFloat)control2Point pointNumber:(NSInteger)pointNumber {
     self = [super init];
     
-    self.type = LayerTypeThirdOrder;
+    self.type = LayerTypeThirdOrder|LayerTypeChangeLocation;
     self.startPoint = startPoint;
     self.endPoint = endPoint;
     self.startColor = startColor;
@@ -82,15 +86,58 @@
     [self.startColor getRed:&startRed green:&startGreen blue:&startBlue alpha:&startAlpha];
 //    BOOL endSuccess =
     [self.endColor getRed:&endRed green:&endGreen blue:&endBlue alpha:&endAlpha];
-    redDiff = (endRed-startRed)/self.pointNumber;
-    greenDiff = (endGreen-startGreen)/self.pointNumber;
-    blueDiff = (endBlue-startBlue)/self.pointNumber;
-    alphaDiff = (endAlpha-startAlpha)/self.pointNumber;
-    
+    redDiff = (endRed-startRed);
+    greenDiff = (endGreen-startGreen);
+    blueDiff = (endBlue-startBlue);
+    alphaDiff = (endAlpha-startAlpha);
+
     NSMutableArray *colorArray = [NSMutableArray array];
-    for (NSInteger i=0; i<=self.pointNumber; i++) {
-        UIColor *color = [UIColor colorWithRed:(startRed+redDiff*i) green:(startGreen+greenDiff*i) blue:(startBlue+blueDiff*i) alpha:(startAlpha+alphaDiff*i)];
-        [colorArray addObject:(__bridge id)color.CGColor];
+    for (CGFloat i=0.f; i<=self.pointNumber; i=i+1) {
+        CGFloat t = i/self.pointNumber;
+        switch (self.type&LayerTypeChangeColor) {
+            case LayerTypeChangeLocation:{
+                UIColor *color = [UIColor colorWithRed:(startRed+redDiff*t) green:(startGreen+greenDiff*t) blue:(startBlue+blueDiff*t) alpha:(startAlpha+alphaDiff*t)];
+                [colorArray addObject:(__bridge id)color.CGColor];
+            }
+                break;
+            case LayerTypeChangeColor:{
+                switch (self.type&LayerTypeThirdOrder) {
+                    case LayerTypeSecondOrder:{
+                        CGFloat controlRed = startRed+redDiff*self.controlPoint;
+                        CGFloat colorRed = SecondBezier(t, startRed, controlRed, endRed);
+                        CGFloat controlGreen = startGreen+greenDiff*self.controlPoint;
+                        CGFloat colorGreen = SecondBezier(t, startGreen, controlGreen, endGreen);
+                        CGFloat controlBlue = startBlue+blueDiff*self.controlPoint;
+                        CGFloat colorBlue = SecondBezier(t, startBlue, controlBlue, endBlue);
+                        CGFloat controlAlpha = startAlpha+alphaDiff*self.controlPoint;
+                        CGFloat colorAlpha = SecondBezier(t, startAlpha, controlAlpha, endAlpha);
+
+                        UIColor *color = [UIColor colorWithRed:colorRed green:colorGreen blue:colorBlue alpha:colorAlpha];
+                        [colorArray addObject:(__bridge id)color.CGColor];
+                    }
+                        break;
+                    case LayerTypeThirdOrder:{
+                        CGFloat control1Red = startRed+redDiff*self.control1Point;
+                        CGFloat control2Red = startRed+redDiff*self.control2Point;
+                        CGFloat colorRed = ThirdBezier(t, startRed, control1Red, control2Red, endRed);
+                        CGFloat control1Green = startGreen+greenDiff*self.control1Point;
+                        CGFloat control2Green = startGreen+greenDiff*self.control2Point;
+                        CGFloat colorGreen = ThirdBezier(t, startGreen, control1Green, control2Green, endGreen);
+                        CGFloat control1Blue = startBlue+blueDiff*self.control1Point;
+                        CGFloat control2Blue = startBlue+blueDiff*self.control2Point;
+                        CGFloat colorBlue = ThirdBezier(t, startBlue, control1Blue, control2Blue, endBlue);
+                        CGFloat control1Alpha = startAlpha+alphaDiff*self.control1Point;
+                        CGFloat control2Alpha = startAlpha+alphaDiff*self.control2Point;
+                        CGFloat colorAlpha = ThirdBezier(t, startAlpha, control1Alpha, control2Alpha, endAlpha);
+
+                        UIColor *color = [UIColor colorWithRed:colorRed green:colorGreen blue:colorBlue alpha:colorAlpha];
+                        [colorArray addObject:(__bridge id)color.CGColor];
+                    }
+                        break;
+                }
+            }
+                break;
+        }
     }
     return colorArray;
 }
@@ -106,26 +153,36 @@
     CGFloat difValue = pow(pow(xdif, 2)+pow(ydif, 2), 0.5);
     for (CGFloat i=0.f; i<self.pointNumber; i=i+1) {
         CGFloat t = i/self.pointNumber;
-        switch (self.type) {
-            case LayerTypeSecondOrder:{
-                CGFloat x = pow((1-t), 2) * self.startPoint.x + 2 * (1-t) * t * controlPoint.x + pow(t, 2) * self.endPoint.x;
-                CGFloat y = pow((1-t), 2) * self.startPoint.y + 2 * (1-t) * t * controlPoint.y + pow(t, 2) * self.endPoint.y;
-                CGFloat result = pow(pow(x, 2)+pow(y, 2), 0.5)*difValue;
-                
-                [numberList addObject:@(result)];
+        switch (self.type&LayerTypeChangeColor) {
+            case LayerTypeChangeLocation:{
+                switch (self.type&LayerTypeThirdOrder) {
+                    case LayerTypeSecondOrder:{
+                        CGFloat x = SecondBezier(t, self.startPoint.x, controlPoint.x, self.endPoint.x);
+                        CGFloat y = SecondBezier(t, self.startPoint.y, controlPoint.y, self.endPoint.y);
+                        CGFloat result = pow(pow(x, 2)+pow(y, 2), 0.5)*difValue;
+
+                        [numberList addObject:@(result)];
+                    }
+                        break;
+                    case LayerTypeThirdOrder:{
+                        CGFloat x = ThirdBezier(t, self.startPoint.x, control1Point.x, control2Point.x, self.endPoint.x);
+                        CGFloat y = ThirdBezier(t, self.startPoint.y, control1Point.y, control2Point.y, self.endPoint.y);
+                        CGFloat result = pow(pow(x, 2)+pow(y, 2), 0.5)*difValue;
+
+                        [numberList addObject:@(result)];
+                    }
+                        break;
+                    default:
+                        break;
+                }
             }
                 break;
-            case LayerTypeThirdOrder:{
-                CGFloat x = pow((1-t), 3) * self.startPoint.x + 3 * pow((1-t), 2) * t * control1Point.x + 3 * (1-t) * pow(t, 2) * control2Point.x + pow(t, 3) * self.endPoint.x;
-                CGFloat y = pow((1-t), 3) * self.startPoint.y + 3 * pow((1-t), 2) * t * control1Point.y + 3 * (1-t) * pow(t, 2) * control2Point.y + pow(t, 3) * self.endPoint.y;
-                CGFloat result = pow(pow(x, 2)+pow(y, 2), 0.5)*difValue;
-                
-                [numberList addObject:@(result)];
+            case LayerTypeChangeColor:{
+                [numberList addObject:@(t)];
             }
-                break;
-            default:
                 break;
         }
+        
     }
     return numberList;
 }
